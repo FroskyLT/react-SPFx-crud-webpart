@@ -11,8 +11,7 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
   constructor(props: IReactCrudProps, state: IReactCrudState) {
     super(props);
     this.state = {
-      status: "Ready",
-      items: []
+      status: "Ready"
     };
   }
 
@@ -50,29 +49,30 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
 
   private getLatestItemId(): Promise<number> {
 
-    const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items?$orderby=Id desc&$top=1&$select=id`;
+    if (this.props.listTitle.length === 0) {
+      this.setState({ status: 'invalid list title' })
+    } else {
+      const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items?$orderby=Id desc&$top=1&$select=id`;
 
-    return new Promise<number>((resolve: (itemId: number) => void, reject: (error: any) => void): void => {
-      this.props.spHttpClient.get(listUrl, SPHttpClient.configurations.v1, {
-        headers: {
-          'Accept': 'application/json;odata=nometadata',
-          'odata-version': ''
-        }
-      })
+      return new Promise<number>((resolve: (itemId: number) => void, reject: (error: any) => void): void => {
+        this.props.spHttpClient.get(listUrl, SPHttpClient.configurations.v1, {
+          headers: {
+            'Accept': 'application/json;odata=nometadata',
+            'odata-version': ''
+          }
+        })
         .then((response: SPHttpClientResponse): Promise<{ value: { Id: number }[] }> => response.json(),
           (error: any): void => reject(error))
         .then((response: { value: { Id: number }[] }): void => {
           if (response.value.length === 0) resolve(-1);
           else resolve(response.value[0].Id);
         });
-    });
+      });
+    }
   }
 
   private createItem(): void {
-    this.setState({
-      status: 'Creating an item...',
-      items: []
-    });
+    this.setState({ status: 'Creating an item...' });
 
     const body: string = JSON.stringify({ 'Title': 'new-item' });
     const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items`;
@@ -86,32 +86,19 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
       body: body
     })
       .then((response: SPHttpClientResponse): Promise<IListItem> => response.json())
-      .then((item: IListItem): void => {
-        this.setState({
-          status: `Item "${item.Title}" "${item.Id}" successfully created`,
-          items: []
-        });
-      }, (error: any): void => {
-        this.setState({
-          status: 'Error while creating an item: ' + error,
-          items: []
-        });
-      });
+      .then((item: IListItem): void =>
+        this.setState({ status: `Item "${item.Title}" "${item.Id}" successfully created` }),
+        (error: any): void => this.setState({ status: `Error to create an item: ${error}` })
+      );
   }
 
   private readItem(): void {
-    this.setState({
-      status: 'Loading latest items...',
-      items: []
-    });
+    this.setState({ status: 'Loading latest item id...' });
 
     this.getLatestItemId()
       .then((itemId: number): Promise<SPHttpClientResponse> => {
         if (itemId === -1) throw new Error('No items found in list');
-        this.setState({
-          status: `Loading information about item with Id: ${itemId}...`,
-          items: []
-        });
+        this.setState({ status: `Loading information about item with id: ${itemId}...` });
 
         const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${itemId})?$select=Title,Id`;
 
@@ -123,26 +110,16 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
         });
       })
       .then((response: SPHttpClientResponse): Promise<IListItem> => response.json())
-      .then((item: IListItem): void => {
-        this.setState({
-          status: `Item Id: ${item.Id}, Title: ${item.Title}`,
-          items: []
-        });
-      }, (error: any): void => {
-        this.setState({
-          status: 'Loading latest item failed with error: ' + error,
-          items: []
-        });
-      });
+      .then((item: IListItem): void =>
+        this.setState({ status: `Item Id: ${item.Id}, Title: ${item.Title}` }),
+        (error: any): void => this.setState({ status: `Loading latest item failed with error: ${error}` })
+      );
   }
 
   private updateItem(): void {
-    this.setState({
-      status: 'Loading latest items...',
-      items: []
-    });
+    this.setState({ status: 'Loading latest item id...' });
 
-    let latestItemId: number = undefined;
+    let latestItemId: number;
 
     this.getLatestItemId()
       .then((itemId: number): Promise<SPHttpClientResponse> => {
@@ -150,12 +127,9 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
 
         latestItemId = itemId;
 
-        this.setState({
-          status: `Loading information about item with ID: ${latestItemId}...`,
-          items: []
-        });
+        this.setState({ status: `Loading information about item with id: ${itemId}...` });
 
-        const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${latestItemId})?$select=Title,Id`;
+        const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${itemId})?$select=Title,Id`;
 
         return this.props.spHttpClient.get(listUrl, SPHttpClient.configurations.v1, {
           headers: {
@@ -166,10 +140,7 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
       })
       .then((response: SPHttpClientResponse): Promise<IListItem> => response.json())
       .then((item: IListItem): Promise<SPHttpClientResponse> => {
-        this.setState({
-          status: 'Pending to update item...',
-          items: []
-        });
+        this.setState({ status: 'Pending to update item...' });
 
         const body: string = JSON.stringify({ 'Title': 'updated-item' });
         const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${item.Id})`;
@@ -184,36 +155,15 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
           },
           body: body
         });
-          // .then((response: SPHttpClientResponse): void => {
-          //   this.setState({
-          //     status: `Item with Id: ${latestItemId} successfully updated`,
-          //     items: []
-          //   });
-          // }, (error: any): void => {
-          //   this.setState({
-          //     status: 'Error updating item: ' + error,
-          //     items: []
-          //   });
-          // });
       })
-      .then((response: SPHttpClientResponse): void => {
-        this.setState({
-          status: `Item with Id: ${latestItemId} successfully updated`,
-          items: []
-        });
-      }, (error: any) => {
-        this.setState({
-          status: `Error updating item: ${error}`,
-          items: []
-        });
-      });
+      .then((response: SPHttpClientResponse): void =>
+        this.setState({ status: `Item with Id: ${latestItemId} successfully updated` }),
+        (error: any) => this.setState({ status: `Error to update an item: ${error}` })
+      );
   }
 
   private deleteItem(): void {
-    this.setState({
-      status: 'Loading latest items...',
-      items: []
-    });
+    this.setState({ status: 'Loading latest item id...' });
 
     let latestItemId: number;
     let etag: string;
@@ -224,12 +174,9 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
 
         latestItemId = itemId;
 
-        this.setState({
-          status: `Loading information about element with Id: ${latestItemId}...`,
-          items: []
-        });
+        this.setState({ status: `Loading information about element with id: ${latestItemId}...` });
 
-        const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${latestItemId})?$select=Id`;
+        const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${itemId})?$select=Id`;
         return this.props.spHttpClient.get(listUrl, SPHttpClient.configurations.v1, {
           headers: {
             'Accept': 'application/json;odata=nometadata',
@@ -242,10 +189,7 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
         return response.json();
       })
       .then((item: IListItem): Promise<SPHttpClientResponse> => {
-        this.setState({
-          status: `Deleting item with Id: ${item.Id}...`,
-          items: []
-        });
+        this.setState({ status: `Deleting item with Id: ${item.Id}...` });
 
         const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${item.Id})`;
 
@@ -259,20 +203,9 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
           }
         });
       })
-      .then((response: SPHttpClientResponse): void => {
-        this.setState({
-          status: `Item with Id: ${latestItemId} successfully deleted`,
-          items: []
-        });
-      }, (error: any) => {
-        this.setState({
-          status: `Error deleting item: ${error}`,
-          items: []
-        });
-      });
+      .then((response: SPHttpClientResponse): void =>
+        this.setState({ status: `Item with Id: ${latestItemId} successfully deleted` }),
+        (error: any) => this.setState({ status: `Error to delete an item: ${error}` })
+      );
   }
 }
-
-/*The read, update and delete operations will be performed on the latest item,
- so we dont need to pass anything to do read, update and delete operations,
-  by default it will consider the latest item from the configured list.*/
