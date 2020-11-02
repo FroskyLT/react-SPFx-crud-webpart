@@ -11,7 +11,8 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
   constructor(props: IReactCrudProps, state: IReactCrudState) {
     super(props);
     this.state = {
-      status: "Ready"
+      status: "Ready",
+      getHeaders: { 'Accept': 'application/json;odata=nometadata', 'odata-version': '' }
     };
   }
 
@@ -36,7 +37,7 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
               </div>
               <div className={styles.customRow}>
                 <div className={styles.customColumn}>
-                  <PrimaryButton text={"Update"} onClick={() => this.updateItem()} />
+                  <PrimaryButton text={"Update"} onClick={async () => this.updateItem()} />
                   <PrimaryButton text={"Delete"} onClick={() => this.deleteItem()} />
                 </div>
               </div>
@@ -47,165 +48,134 @@ export default class ReactCrud extends React.Component<IReactCrudProps, IReactCr
     );
   }
 
-  private getLatestItemId(): Promise<number> {
+  private async getLatestItemId(): Promise<number> {
 
-    if (this.props.listTitle.length === 0) {
-      this.setState({ status: 'invalid list title' })
-    } else {
-      const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items?$orderby=Id desc&$top=1&$select=id`;
+    const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items?$orderby=Id desc&$top=1&$select=id`;
 
-      return new Promise<number>((resolve: (itemId: number) => void, reject: (error: any) => void): void => {
-        this.props.spHttpClient.get(listUrl, SPHttpClient.configurations.v1, {
-          headers: {
-            'Accept': 'application/json;odata=nometadata',
-            'odata-version': ''
-          }
-        })
-        .then((response: SPHttpClientResponse): Promise<{ value: { Id: number }[] }> => response.json(),
-          (error: any): void => reject(error))
-        .then((response: { value: { Id: number }[] }): void => {
-          if (response.value.length === 0) resolve(-1);
-          else resolve(response.value[0].Id);
-        });
-      });
-    }
+    const response: SPHttpClientResponse = await this.props.spHttpClient
+      .get(listUrl, SPHttpClient.configurations.v1, { headers: this.state.getHeaders });
+    const data: { value: { Id: number }[] } = await response.json();
+
+    if (data.value.length === 0) return -1;
+    else return data.value[0].Id;
+  }
+  private async getLatestItem(): Promise<IListItem> {
+    try {
+      const itemID: number = await this.getLatestItemId();
+
+      if (itemID === -1) throw new Error('No items found in list');
+      this.setState({ status: `Loading information about item with id: ${itemID}...` });
+
+      const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${itemID})?$select=Title,Id`;
+
+      const response: SPHttpClientResponse = await this.props.spHttpClient.get(listUrl, SPHttpClient.configurations.v1, { headers: this.state.getHeaders });
+      const item: IListItem = await response.json();
+
+      return item;
+
+    } catch (error) { this.setState({ status: `Error to read an item: ${error}` }); }
   }
 
+
   private createItem(): void {
+
     this.setState({ status: 'Creating an item...' });
 
     const body: string = JSON.stringify({ 'Title': 'new-item' });
     const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items`;
+    const createHeaders: HeadersInit =
+      { 'Content-type': 'application/json;odata=nometadata', ...this.state.getHeaders };
 
-    this.props.spHttpClient.post(listUrl, SPHttpClient.configurations.v1, {
-      headers: {
-        'Accept': 'application/json;odata=nometadata',
-        'Content-type': 'application/json;odata=nometadata',
-        'odata-version': ''
-      },
-      body: body
-    })
-      .then((response: SPHttpClientResponse): Promise<IListItem> => response.json())
-      .then((item: IListItem): void =>
-        this.setState({ status: `Item "${item.Title}" "${item.Id}" successfully created` }),
-        (error: any): void => this.setState({ status: `Error to create an item: ${error}` })
-      );
+    const postItem: () => Promise<IListItem> = async () => {
+      const response: SPHttpClientResponse = await this.props.spHttpClient
+        .post(listUrl, SPHttpClient.configurations.v1, { headers: createHeaders, body: body });
+      const item: IListItem = await response.json();
+
+      return item;
+    };
+
+    postItem().then((item: IListItem): void =>
+      this.setState({ status: `Item "${item.Title}" "${item.Id}" successfully created` }),
+      (error: any): void => this.setState({ status: `Error to create an item: ${error.message}` })
+    );
   }
 
   private readItem(): void {
-    this.setState({ status: 'Loading latest item id...' });
 
-    this.getLatestItemId()
-      .then((itemId: number): Promise<SPHttpClientResponse> => {
-        if (itemId === -1) throw new Error('No items found in list');
-        this.setState({ status: `Loading information about item with id: ${itemId}...` });
+    this.setState({ status: 'Loading latest item...' });
 
-        const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${itemId})?$select=Title,Id`;
-
-        return this.props.spHttpClient.get(listUrl, SPHttpClient.configurations.v1, {
-          headers: {
-            'Accept': 'application/json;odata=nometadata',
-            'odata-version': ''
-          }
-        });
-      })
-      .then((response: SPHttpClientResponse): Promise<IListItem> => response.json())
-      .then((item: IListItem): void =>
-        this.setState({ status: `Item Id: ${item.Id}, Title: ${item.Title}` }),
-        (error: any): void => this.setState({ status: `Loading latest item failed with error: ${error}` })
-      );
+    this.getLatestItem().then((item: IListItem) =>
+      this.setState({ status: `Item Id: ${item.Id}, Title: ${item.Title}` }));
   }
 
   private updateItem(): void {
-    this.setState({ status: 'Loading latest item id...' });
+
+    this.setState({ status: 'Loading latest item...' });
 
     let latestItemId: number;
+    const updateHeaders: HeadersInit =
+      { ...this.state.getHeaders, 'Content-type': 'application/json;odata=nometadata', 'IF-MATCH': '*', 'X-HTTP-Method': 'MERGE' };
 
-    this.getLatestItemId()
-      .then((itemId: number): Promise<SPHttpClientResponse> => {
-        if (itemId === -1) throw new Error('No items found in list');
+     const update: () => void = async () => {
+      try {
+        const item: IListItem = await this.getLatestItem();
 
-        latestItemId = itemId;
+        if(typeof item === 'undefined') throw new Error('while reading an item');
+          latestItemId = item.Id;
+          this.setState({ status: 'Pending to update item...' });
+          const body: string = JSON.stringify({ 'Title': 'updated-item' });
+          const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${item.Id})`;
+          
+          const response: SPHttpClientResponse = await this.props.spHttpClient.post(listUrl, SPHttpClient.configurations.v1, { headers: updateHeaders, body: body });
+          
+          this.setState({ status: `Item with Id: ${latestItemId} successfully updated` });
 
-        this.setState({ status: `Loading information about item with id: ${itemId}...` });
 
-        const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${itemId})?$select=Title,Id`;
+      } catch (error) { this.setState({ status: `Error to update an item: ${error.message}` }); }
+     };
 
-        return this.props.spHttpClient.get(listUrl, SPHttpClient.configurations.v1, {
-          headers: {
-            'Accept': 'application/json;odata=nometadata',
-            'odata-version': ''
-          }
-        });
-      })
-      .then((response: SPHttpClientResponse): Promise<IListItem> => response.json())
-      .then((item: IListItem): Promise<SPHttpClientResponse> => {
-        this.setState({ status: 'Pending to update item...' });
-
-        const body: string = JSON.stringify({ 'Title': 'updated-item' });
-        const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${item.Id})`;
-
-        return this.props.spHttpClient.post(listUrl, SPHttpClient.configurations.v1, {
-          headers: {
-            'Accept': 'application/json;odata=nometadata',
-            'Content-type': 'application/json;odata=nometadata',
-            'odata-version': '',
-            'IF-MATCH': '*',
-            'X-HTTP-Method': 'MERGE'
-          },
-          body: body
-        });
-      })
-      .then((response: SPHttpClientResponse): void =>
-        this.setState({ status: `Item with Id: ${latestItemId} successfully updated` }),
-        (error: any) => this.setState({ status: `Error to update an item: ${error}` })
-      );
+     update();
   }
 
   private deleteItem(): void {
-    this.setState({ status: 'Loading latest item id...' });
+    this.setState({ status: 'Loading latest item...' });
 
     let latestItemId: number;
     let etag: string;
 
-    this.getLatestItemId()
-      .then((itemId: number): Promise<SPHttpClientResponse> => {
-        if (itemId === -1) throw new Error('No items found in the list');
+    const getLItem: () => Promise<IListItem> = async () => {
+      try {
+        const itemID: number = await this.getLatestItemId();
+        
+        if (itemID === -1) throw new Error('No items found in list');
+        this.setState({ status: `Loading information about item with id: ${itemID}...` });
+        const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${itemID})?$select=Title,Id`;
 
-        latestItemId = itemId;
-
-        this.setState({ status: `Loading information about element with id: ${latestItemId}...` });
-
-        const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${itemId})?$select=Id`;
-        return this.props.spHttpClient.get(listUrl, SPHttpClient.configurations.v1, {
-          headers: {
-            'Accept': 'application/json;odata=nometadata',
-            'odata-version': ''
-          }
-        });
-      })
-      .then((response: SPHttpClientResponse): Promise<IListItem> => {
+        const response: SPHttpClientResponse = await this.props.spHttpClient.get(listUrl, SPHttpClient.configurations.v1, { headers: this.state.getHeaders });
+        const item: IListItem = await response.json();
         etag = response.headers.get('ETag');
-        return response.json();
-      })
-      .then((item: IListItem): Promise<SPHttpClientResponse> => {
+        latestItemId = item.Id;
+        return item;
+
+      } catch (error) { this.setState({ status: `Error to read an item: ${error}` }); }
+    };
+
+    const deleteLItem: () => void = async () => {
+      try {
+        const item: IListItem = await getLItem();
+        if(typeof item === 'undefined') throw new Error('while reading an item');
+
         this.setState({ status: `Deleting item with Id: ${item.Id}...` });
-
         const listUrl: string = `${this.props.siteUrl}/_api/web/lists/getbytitle('${this.props.listTitle}')/items(${item.Id})`;
+        const deleteHeaders: HeadersInit =
+          { ...this.state.getHeaders, 'Content-type': 'application/json;odata=nometadata', 'IF-MATCH': etag, 'X-HTTP-Method': 'DELETE' };
 
-        return this.props.spHttpClient.post(listUrl, SPHttpClient.configurations.v1, {
-          headers: {
-            'Accept': 'application/json;odata=nometadata',
-            'Content-type': 'application/json;odata=verbose',
-            'odata-version': '',
-            'IF-MATCH': etag,
-            'X-HTTP-Method': 'DELETE'
-          }
-        });
-      })
-      .then((response: SPHttpClientResponse): void =>
-        this.setState({ status: `Item with Id: ${latestItemId} successfully deleted` }),
-        (error: any) => this.setState({ status: `Error to delete an item: ${error}` })
-      );
+        const response: SPHttpClientResponse = await this.props.spHttpClient.post(listUrl, SPHttpClient.configurations.v1, { headers: deleteHeaders });
+
+        this.setState({ status: `Item with Id: ${latestItemId} successfully deleted` });
+
+      } catch (error) { this.setState({ status: `Error to delete an item: ${error.message}` }); }
+    };
+    deleteLItem();
   }
 }
