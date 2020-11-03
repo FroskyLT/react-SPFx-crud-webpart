@@ -2,17 +2,10 @@
 
 .reactCrud {
 
-  .customBody {
-    .customRow {
-      .customColumn {
-        display: flex;
-        justify-content: space-around;
-      }
-      margin: 0 0 10px 0;
-    }
-    width: 30%;
-    margin: 0 auto;
-  }
+  .buttonItems {
+    display: flex;
+    justify-content: center;
+  } 
 
   .container {
     max-width: 700px;

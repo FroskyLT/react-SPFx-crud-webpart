@@ -1,6 +1,6 @@
 import { IListItem } from './IListItem';
 export interface IReactCrudState {
+  listTitle: string;
   status: string;
-  getHeaders: HeadersInit;
   items?: IListItem[];
 }

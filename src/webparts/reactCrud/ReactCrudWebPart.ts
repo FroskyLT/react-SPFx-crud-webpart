@@ -21,7 +21,7 @@ export default class ReactCrudWebPart extends BaseClientSideWebPart<IReactCrudWe
     const element: React.ReactElement<IReactCrudProps> = React.createElement(
       ReactCrud,
       {
-        listTitle: this.properties.listTitle,
+        //listTitle: this.properties.listTitle,
         spHttpClient: this.context.spHttpClient,
         siteUrl: this.context.pageContext.web.absoluteUrl
       }
@@ -32,10 +32,6 @@ export default class ReactCrudWebPart extends BaseClientSideWebPart<IReactCrudWe
 
   protected onDispose(): void {
     ReactDom.unmountComponentAtNode(this.domElement);
-  }
-
-  protected get dataVersion(): Version {
-    return Version.parse('1.0');
   }
 
   protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
