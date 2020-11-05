@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDom from 'react-dom';
-import { Version } from '@microsoft/sp-core-library';
+//import { Version } from '@microsoft/sp-core-library';
 import {
   IPropertyPaneConfiguration,
   PropertyPaneTextField
@@ -9,7 +9,7 @@ import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
 
 import * as strings from 'ReactCrudWebPartStrings';
 import ReactCrud from './components/ReactCrud';
-import { IReactCrudProps } from './components/IReactCrudProps';
+import { IReactCrudProps } from './components/interfaces/IReactCrudProps';
 
 export interface IReactCrudWebPartProps {
   listTitle: string;

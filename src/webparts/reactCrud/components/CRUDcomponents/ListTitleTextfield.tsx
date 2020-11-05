@@ -3,30 +3,23 @@ import { TextField, ITextFieldStyles, ITextFieldStyleProps } from 'office-ui-fab
 import { ILabelStyles, ILabelStyleProps } from 'office-ui-fabric-react/lib/Label';
 
 interface IListTitleTextfieldProps {
-  handleSubmit(title: string): void;
+  changeListTitle(title: string): void;
 }
 
-const ListTitleTextfield: React.FC<IListTitleTextfieldProps> = (props) => {
+const ListTitleTextfield: React.FC<IListTitleTextfieldProps> = (props: IListTitleTextfieldProps) => {
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    props.handleSubmit(event.target.value);
+    props.changeListTitle(event.target.value);
   };
 
   return <div>
-    <TextField label="Your Sharepoint list title:" placeholder="testList"
+    <TextField label="Your Sharepoint list title:" placeholder="list title"
       required styles={getStyles} onChange={handleChange} />
   </div>;
 };
 
 function getStyles(props: ITextFieldStyleProps): Partial<ITextFieldStyles> {
-  const { required } = props;
   return {
-    // fieldGroup: [
-    //    { width: 300 },
-    //   required && {
-    //     borderTopColor: props.theme.semanticColors.errorText,
-    //   },
-    // ],
     subComponentStyles: {
       label: getLabelStyles,
     },

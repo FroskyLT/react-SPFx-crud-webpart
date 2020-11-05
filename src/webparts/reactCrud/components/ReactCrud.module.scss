@@ -16,8 +16,8 @@
   .row {
     @include ms-Grid-row;
     @include ms-fontColor-white;
-    background-color: $ms-color-themeDark;
-    padding: 20px;
+    background-color: $ms-color-neutralPrimary;
+    padding: 10px 10px 0 10px;
   }
 
   .column {
@@ -26,6 +26,17 @@
     @include ms-xl8;
     @include ms-xlPush2;
     @include ms-lgPush1;
+    
+    width: 83.333% !important;
+
+    .customColumn {
+      display: flex;
+      margin: 10px 0 20px;
+      .customColumn__item {
+        flex-grow: 1;
+        margin: 0 5px;
+      }
+    }
   }
 
   .title {
